@@ -1,0 +1,98 @@
+/* CSS-only animated starfield background */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0%, #0b0730 0%, #030014 55%, #000000 100%);
+}
+
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background-repeat: repeat;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 90px 120px, #ffffff 100%, transparent 0),
+    radial-gradient(1.5px 1.5px at 160px 60px, #c9d6ff 100%, transparent 0),
+    radial-gradient(1px 1px at 210px 180px, #ffffff 100%, transparent 0),
+    radial-gradient(1.5px 1.5px at 260px 20px, #a78bfa 100%, transparent 0),
+    radial-gradient(1px 1px at 320px 140px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 50px 170px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 120px 40px, #ffffff 100%, transparent 0),
+    radial-gradient(1.5px 1.5px at 190px 110px, #7dd3fc 100%, transparent 0),
+    radial-gradient(1px 1px at 240px 200px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 300px 70px, #ffffff 100%, transparent 0),
+    radial-gradient(1.5px 1.5px at 340px 190px, #f0abfc 100%, transparent 0),
+    radial-gradient(1px 1px at 10px 100px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 75px 210px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 145px 15px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 275px 150px, #ffffff 100%, transparent 0);
+  background-size: 350px 220px;
+  opacity: 0.7;
+  animation: drift-stars 140s linear infinite;
+}
+
+.starfield::after {
+  background-size: 480px 320px;
+  opacity: 0.4;
+  animation-duration: 220s;
+  animation-direction: reverse;
+}
+
+/* A denser layer of tiny, distant stars for extra depth */
+.starfield-far {
+  position: absolute;
+  inset: -50%;
+  background-repeat: repeat;
+  background-image:
+    radial-gradient(1px 1px at 15px 25px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 45px 90px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 75px 45px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 105px 130px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 135px 70px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 20px 140px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 60px 10px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 95px 100px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 125px 30px, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 150px 110px, #ffffff 100%, transparent 0);
+  background-size: 160px 150px;
+  opacity: 0.5;
+  animation: drift-stars 300s linear infinite;
+}
+
+@keyframes drift-stars {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-1000px, 800px, 0);
+  }
+}
+
+.starfield-twinkle {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 8% 15%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 22% 62%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 35% 30%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 40% 70%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 55% 12%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 62% 88%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 68% 45%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 80% 20%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 88% 65%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 10% 40%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 60% 85%, #ffffff 100%, transparent 0),
+    radial-gradient(1px 1px at 92% 92%, #ffffff 100%, transparent 0);
+  background-size: 600px 600px;
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.9; }
+}
