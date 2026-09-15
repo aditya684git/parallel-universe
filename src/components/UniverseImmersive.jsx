@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { audio } from '../utils/audio'
+import { usePrefersReducedMotion } from '../utils/usePrefersReducedMotion'
 
 function Gauge({ label, value, color }) {
   const circumference = 2 * Math.PI * 42
@@ -37,8 +39,14 @@ function Gauge({ label, value, color }) {
  */
 export default function UniverseImmersive({ universe, onClose }) {
   const [eventIndex, setEventIndex] = useState(0)
+  const reducedMotion = usePrefersReducedMotion()
 
   useEffect(() => setEventIndex(0), [universe?.id])
+
+  useEffect(() => {
+    if (universe) audio.enter()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [universe?.id])
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -49,7 +57,7 @@ export default function UniverseImmersive({ universe, onClose }) {
   if (!universe) return null
   const { theme, timeline } = universe
   const event = timeline[eventIndex]
-  const isChaotic = universe.type === 'chaotic'
+  const isChaotic = universe.type === 'chaotic' && !reducedMotion
 
   return (
     <AnimatePresence>
@@ -82,11 +90,13 @@ export default function UniverseImmersive({ universe, onClose }) {
                 boxShadow: `0 0 8px ${theme.glow}`,
               }}
               animate={
-                isChaotic
-                  ? { y: [0, -30, 10, 0], x: [0, 15, -10, 0], opacity: [0.2, 1, 0.4, 0.2] }
-                  : { y: [0, -18, 0], opacity: [0.15, 0.8, 0.15] }
+                reducedMotion
+                  ? { opacity: 0.5 }
+                  : isChaotic
+                    ? { y: [0, -30, 10, 0], x: [0, 15, -10, 0], opacity: [0.2, 1, 0.4, 0.2] }
+                    : { y: [0, -18, 0], opacity: [0.15, 0.8, 0.15] }
               }
-              transition={{ duration: 5 + (i % 6), repeat: Infinity, delay: i * 0.12 }}
+              transition={{ duration: 5 + (i % 6), repeat: reducedMotion ? 0 : Infinity, delay: i * 0.12 }}
             />
           ))}
         </div>

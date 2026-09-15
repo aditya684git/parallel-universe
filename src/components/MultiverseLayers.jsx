@@ -10,7 +10,8 @@ const LAYERS = [
  * Three stacked layers (Prime / Divergent / Chaotic) showing which universes
  * live in each. Clicking a universe chip highlights it in the causal graph.
  */
-export default function MultiverseLayers({ universes, selectedId, onSelect }) {
+export default function MultiverseLayers({ universes, selectedId, highlightIds, onSelect }) {
+  const highlighted = highlightIds ?? (selectedId ? [selectedId] : [])
   return (
     <div className="flex flex-col gap-4">
       {LAYERS.map((layer, layerIndex) => {
@@ -41,10 +42,10 @@ export default function MultiverseLayers({ universes, selectedId, onSelect }) {
                     whileTap={{ scale: 0.96 }}
                     className="rounded-full border px-3 py-1 text-xs font-medium transition-shadow"
                     style={{
-                      borderColor: u.id === selectedId ? u.theme.primary : 'rgba(255,255,255,0.15)',
+                      borderColor: highlighted.includes(u.id) ? u.theme.primary : 'rgba(255,255,255,0.15)',
                       color: u.theme.primary,
-                      boxShadow: u.id === selectedId ? `0 0 14px ${u.theme.glow}` : 'none',
-                      background: u.id === selectedId ? `${u.theme.primary}1a` : 'rgba(255,255,255,0.04)',
+                      boxShadow: highlighted.includes(u.id) ? `0 0 14px ${u.theme.glow}` : 'none',
+                      background: highlighted.includes(u.id) ? `${u.theme.primary}1a` : 'rgba(255,255,255,0.04)',
                     }}
                   >
                     {u.name}

@@ -2,19 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { motion, AnimatePresence } from 'framer-motion'
 import { buildGraph } from '../utils/buildGraph'
+import { usePrefersReducedMotion } from '../utils/usePrefersReducedMotion'
 
 /**
  * Force-directed causal graph of universes. Nodes glow according to entropy,
  * edges animate with directional particles, and Time Rift mode scrambles
  * node positions + inverts colors for a few seconds.
  */
-export default function UniverseGraph({ universes, selectedId, onSelect, shock, anomalyIds }) {
+export default function UniverseGraph({ universes, selectedId, highlightIds, onSelect, shock, anomalyIds }) {
   const containerRef = useRef(null)
   const fgRef = useRef(null)
   const [size, setSize] = useState({ width: 600, height: 500 })
   const [hoverNode, setHoverNode] = useState(null)
   const [mouse, setMouse] = useState({ x: 0, y: 0 })
   const [shockKey, setShockKey] = useState(0)
+  const reducedMotion = usePrefersReducedMotion()
+  const highlighted = highlightIds ?? (selectedId ? [selectedId] : [])
 
   const graphData = useMemo(() => buildGraph(universes, anomalyIds), [universes, anomalyIds])
 
@@ -40,7 +43,7 @@ export default function UniverseGraph({ universes, selectedId, onSelect, shock, 
 
   // Scramble node positions when Time Rift triggers, then let them re-settle.
   useEffect(() => {
-    if (!shock || !fgRef.current) return
+    if (!shock || !fgRef.current || reducedMotion) return
     setShockKey((k) => k + 1)
     graphData.nodes.forEach((node) => {
       node.fx = node.x + (Math.random() - 0.5) * 260
@@ -61,11 +64,11 @@ export default function UniverseGraph({ universes, selectedId, onSelect, shock, 
   const paintNode = (node, ctx, globalScale) => {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return
     const radius = 4 + node.val / 3
-    const isSelected = node.id === selectedId
+    const isSelected = highlighted.includes(node.id)
     const isHovered = node.id === hoverNode?.id
 
-    // Outer glow, breathing gently so the graph feels alive
-    const pulse = 0.85 + Math.sin(Date.now() / 480 + node.index) * 0.15
+    // Outer glow, breathing gently so the graph feels alive (skipped for reduced motion)
+    const pulse = reducedMotion ? 1 : 0.85 + Math.sin(Date.now() / 480 + node.index) * 0.15
     const glowRadius = radius * (isSelected || isHovered ? 3.2 : 2.4) * (0.6 + node.glowIntensity) * pulse
     const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowRadius)
     gradient.addColorStop(0, node.glow)
@@ -124,12 +127,22 @@ export default function UniverseGraph({ universes, selectedId, onSelect, shock, 
       }}
       className="relative h-full w-full overflow-hidden rounded-2xl border border-fuchsia-500/20 bg-black/20"
       animate={
-        shock
+        shock && !reducedMotion
           ? { x: [0, -8, 8, -6, 6, -3, 3, 0], filter: ['invert(0) hue-rotate(0deg)', 'invert(1) hue-rotate(180deg)'] }
-          : { x: 0, filter: 'invert(0) hue-rotate(0deg)' }
+          : shock
+            ? { opacity: [1, 0.4, 1], filter: 'invert(0) hue-rotate(0deg)' }
+            : { x: 0, filter: 'invert(0) hue-rotate(0deg)' }
       }
       transition={shock ? { duration: 0.9, repeat: 2 } : { duration: 0.6 }}
     >
+      <button
+        type="button"
+        onClick={() => fgRef.current?.zoomToFit(600, 60)}
+        className="absolute right-2 top-2 z-10 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[11px] text-slate-300 backdrop-blur transition-colors hover:border-white/40 hover:text-white"
+      >
+        ⤢ Recenter
+      </button>
+
       <ForceGraph2D
         ref={fgRef}
         width={size.width}
@@ -150,7 +163,7 @@ export default function UniverseGraph({ universes, selectedId, onSelect, shock, 
       />
 
       <AnimatePresence>
-        {shock && (
+        {shock && !reducedMotion && (
           <motion.div
             key={shockKey}
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"

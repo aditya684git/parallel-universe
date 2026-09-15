@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
 import InputModal from './components/InputModal'
-import UniverseGraph from './components/UniverseGraph'
 import MultiverseLayers from './components/MultiverseLayers'
 import UniversePanel from './components/UniversePanel'
 import UniverseImmersive from './components/UniverseImmersive'
+import CompareUniverses from './components/CompareUniverses'
 import { applyRiftMutation, createRiftUniverses, generateUniverses } from './utils/generateUniverses'
+import { audio } from './utils/audio'
+
+// Heavy graph deps (react-force-graph-2d / three) only load once a multiverse exists.
+const UniverseGraph = lazy(() => import('./components/UniverseGraph'))
 
 const SHOCK_DURATION = 950
 const ANOMALY_GLOW_DURATION = 2600
@@ -17,6 +21,16 @@ const LEGEND = [
   { label: 'Rift-born', color: '#facc15' },
 ]
 
+const NAV_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Escape']
+
+function GraphLoadingFallback() {
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-slate-500">
+      Loading causal graph…
+    </div>
+  )
+}
+
 function App() {
   const [universes, setUniverses] = useState([])
   const [modalOpen, setModalOpen] = useState(true)
@@ -26,6 +40,9 @@ function App() {
   const [shock, setShock] = useState(false)
   const [anomalyIds, setAnomalyIds] = useState([])
   const [riftLog, setRiftLog] = useState(null)
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareIds, setCompareIds] = useState([])
+  const [muted, setMuted] = useState(() => audio.isMuted())
 
   const selectedUniverse = useMemo(
     () => universes.find((u) => u.id === selectedId) ?? null,
@@ -35,6 +52,7 @@ function App() {
     () => universes.find((u) => u.id === immersiveId) ?? null,
     [universes, immersiveId],
   )
+  const highlightIds = compareMode ? compareIds : selectedId ? [selectedId] : []
 
   useEffect(() => {
     if (!riftLog) return
@@ -51,7 +69,55 @@ function App() {
     setTimeRift(false)
     setShock(false)
     setRiftLog(null)
+    setCompareMode(false)
+    setCompareIds([])
+    audio.generate()
   }, [])
+
+  const handleReset = useCallback(() => {
+    setUniverses([])
+    setSelectedId(null)
+    setImmersiveId(null)
+    setTimeRift(false)
+    setShock(false)
+    setAnomalyIds([])
+    setRiftLog(null)
+    setCompareMode(false)
+    setCompareIds([])
+  }, [])
+
+  const toggleCompareMode = useCallback(() => {
+    setCompareMode((prev) => {
+      const next = !prev
+      setSelectedId(null)
+      setCompareIds([])
+      return next
+    })
+  }, [])
+
+  const toggleMuted = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev
+      audio.setMuted(next)
+      return next
+    })
+  }, [])
+
+  const handleSelect = useCallback(
+    (id) => {
+      if (compareMode) {
+        setCompareIds((prev) => {
+          if (prev.includes(id)) return prev.filter((x) => x !== id)
+          if (prev.length >= 2) return [prev[1], id]
+          return [...prev, id]
+        })
+        return
+      }
+      setSelectedId(id)
+      audio.select()
+    },
+    [compareMode],
+  )
 
   // Time Rift: a shockwave plays, then the multiverse is permanently reshaped —
   // existing universes destabilize and brand-new Rift-born universes tear in.
@@ -59,6 +125,7 @@ function App() {
     if (universes.length === 0 || timeRift) return
     setTimeRift(true)
     setShock(true)
+    audio.riftShock()
 
     setTimeout(() => {
       setShock(false)
@@ -77,6 +144,7 @@ function App() {
 
         return [...mutated, ...spawned]
       })
+      audio.riftSettle()
 
       setTimeout(() => {
         setTimeRift(false)
@@ -85,11 +153,57 @@ function App() {
     }, SHOCK_DURATION)
   }, [universes, timeRift])
 
+  // Arrow keys walk the causal tree (parent/child/sibling); Enter steps inside; Escape deselects.
+  useEffect(() => {
+    function handleKey(e) {
+      if (modalOpen || immersiveId || compareMode || universes.length === 0) return
+      if (!NAV_KEYS.includes(e.key)) return
+      e.preventDefault()
+
+      if (e.key === 'Escape') {
+        setSelectedId(null)
+        return
+      }
+      if (e.key === 'Enter') {
+        if (selectedId) setImmersiveId(selectedId)
+        return
+      }
+
+      const currentId = selectedId ?? universes[0]?.id
+      const current = universes.find((u) => u.id === currentId)
+      if (!current) return
+
+      let nextId = null
+      if (e.key === 'ArrowUp') {
+        nextId = current.parentId
+      } else if (e.key === 'ArrowDown') {
+        nextId = universes.find((u) => u.parentId === current.id)?.id ?? null
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const siblings = universes.filter((u) => u.parentId === current.parentId)
+        const idx = siblings.findIndex((u) => u.id === current.id)
+        if (idx !== -1) {
+          const delta = e.key === 'ArrowRight' ? 1 : -1
+          nextId = siblings[(idx + delta + siblings.length) % siblings.length]?.id ?? null
+        }
+      }
+
+      if (nextId) {
+        setSelectedId(nextId)
+        audio.select()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [modalOpen, immersiveId, compareMode, universes, selectedId])
+
   const panelUniverse = selectedUniverse
     ? { ...selectedUniverse, anomaly: anomalyIds.includes(selectedUniverse.id) }
     : null
+  const compareUniverseA = universes.find((u) => u.id === compareIds[0]) ?? null
+  const compareUniverseB = universes.find((u) => u.id === compareIds[1]) ?? null
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen text-slate-100">
       <div className="starfield">
         <div className="starfield-far" />
@@ -98,6 +212,30 @@ function App() {
 
       <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-8 sm:px-8">
         <header className="flex flex-col items-center gap-4 text-center">
+          <div className="flex w-full items-center justify-between">
+            <button
+              type="button"
+              onClick={toggleMuted}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+              title={muted ? 'Unmute sound' : 'Mute sound'}
+            >
+              {muted ? '🔇 Sound off' : '🔊 Sound on'}
+            </button>
+            <button
+              type="button"
+              disabled={universes.length === 0}
+              onClick={toggleCompareMode}
+              className="rounded-full border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                borderColor: compareMode ? '#38bdf8' : 'rgba(255,255,255,0.1)',
+                color: compareMode ? '#38bdf8' : '#94a3b8',
+                background: compareMode ? '#38bdf81a' : 'transparent',
+              }}
+            >
+              {compareMode ? 'Exit Compare' : 'Compare Universes'}
+            </button>
+          </div>
+
           <motion.h1
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -129,6 +267,16 @@ function App() {
             >
               {timeRift ? 'Rift tearing open…' : 'Trigger Time Rift'}
             </motion.button>
+            <motion.button
+              type="button"
+              disabled={universes.length === 0}
+              whileHover={{ scale: universes.length ? 1.05 : 1 }}
+              whileTap={{ scale: universes.length ? 0.96 : 1 }}
+              onClick={handleReset}
+              className="rounded-full border border-white/15 bg-white/5 px-6 py-2 text-sm font-semibold text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Reset
+            </motion.button>
           </div>
         </header>
 
@@ -147,18 +295,29 @@ function App() {
                 ))}
               </div>
               <div className="min-h-0 flex-1">
-                <UniverseGraph
-                  universes={universes}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  shock={shock}
-                  anomalyIds={anomalyIds}
-                />
+                <Suspense fallback={<GraphLoadingFallback />}>
+                  <UniverseGraph
+                    universes={universes}
+                    selectedId={selectedId}
+                    highlightIds={highlightIds}
+                    onSelect={handleSelect}
+                    shock={shock}
+                    anomalyIds={anomalyIds}
+                  />
+                </Suspense>
               </div>
+              <p className="px-1 text-[10px] text-slate-500">
+                ↑ ↓ ← → navigate the causal tree · Enter to step inside · Esc to deselect
+              </p>
             </section>
 
             <section className="max-h-[70vh] overflow-y-auto pr-1">
-              <MultiverseLayers universes={universes} selectedId={selectedId} onSelect={setSelectedId} />
+              {compareMode && (
+                <p className="mb-3 rounded-lg border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs text-sky-200">
+                  Compare Mode: select 2 universes ({compareIds.length}/2 chosen)
+                </p>
+              )}
+              <MultiverseLayers universes={universes} highlightIds={highlightIds} onSelect={handleSelect} />
             </section>
           </main>
         )}
@@ -200,9 +359,21 @@ function App() {
       </div>
 
       <InputModal open={modalOpen} onComplete={handleGenerate} />
-      <UniversePanel universe={panelUniverse} onClose={() => setSelectedId(null)} onEnter={setImmersiveId} />
+      {!compareMode && (
+        <UniversePanel universe={panelUniverse} onClose={() => setSelectedId(null)} onEnter={setImmersiveId} />
+      )}
       {immersiveUniverse && <UniverseImmersive universe={immersiveUniverse} onClose={() => setImmersiveId(null)} />}
+      <AnimatePresence>
+        {compareMode && compareUniverseA && compareUniverseB && (
+          <CompareUniverses
+            universeA={compareUniverseA}
+            universeB={compareUniverseB}
+            onClose={() => setCompareIds([])}
+          />
+        )}
+      </AnimatePresence>
     </div>
+    </MotionConfig>
   )
 }
 

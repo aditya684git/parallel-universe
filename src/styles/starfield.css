@@ -96,3 +96,13 @@
   0%, 100% { opacity: 0.2; }
   50% { opacity: 0.9; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .starfield::before,
+  .starfield::after,
+  .starfield-far,
+  .starfield-twinkle {
+    animation: none;
+    opacity: 0.5;
+  }
+}
